@@ -36,15 +36,17 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
                     >
                         <EllipsisVertical className='hover' />
                         {showMore &&
-                            <div className='text-sm absolute right-3 top-7 border rounded-md bg-[#282142]  w-[80px]  z-20'
+                            <div className='flex flex-col text-xs py-1 absolute right-3 top-7 border rounded-md bg-gray-700 min-w-[80px] z-20'
                                 onMouseEnter={() => setShowMore(true)}
                                 onMouseLeave={() => setShowMore(false)}
                             >
-                                <ul className='flex flex-col'>
-                                    <li className='cursor-pointer' onClick={() => navigate('/profile')}>Edit</li>
-                                    <hr />
-                                    <li className='cursor-pointer' onClick={() => doLogout()}>Logout</li>
-                                </ul>
+                                <p className='cursor-pointer px-3 py-2 hover:bg-gray-600 text-left' onClick={() => navigate('/profile')}>
+                                    Edit
+                                </p>
+                                <hr className="w-full border-t border-gray-300 my-1" />
+                                <p className='cursor-pointer px-3 py-2 hover:bg-gray-600 text-left' onClick={() => doLogout()}>
+                                    Logout
+                                </p>
                             </div>
                         }
                     </div>
@@ -62,7 +64,8 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
                         {usersData.map((user, index) => (
                             <div
                                 key={user._id}
-                                className={`flex flex-row text-white py-1 gap-3 border-b-0.5 rounded-md border-gray-600 relative ${selectedUser?._id === user._id && 'bg-gray-600'}`
+                                className={`flex flex-row text-white py-1 gap-3 border-b-0.5 rounded-md border-gray-600 cursor-default relative hover:bg-gray-700
+                                    ${selectedUser?._id === user._id && 'bg-gray-600'}`
                                 }
                                 onClick={() => {
                                     fetchChats(user);

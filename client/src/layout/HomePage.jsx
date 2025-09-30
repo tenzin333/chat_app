@@ -7,11 +7,11 @@ const HomePage = () => {
     const [selectedUser, setSelectedUser] = useState(null)
     return (
         <div className="flex  items-center justify-center  min-h-screen ">
-            <div className={`grid grid-cols-1 overflow-hidden backdrop-blur-xl border-2 border-gray-600 rounded-2xl shadow-xl min-w-[90%] h-[550px] gap-2 backdrop-sepia-0 
+            <div className={`grid grid-cols-1 overflow-hidden backdrop-blur-2xl border-2 border-gray-600 rounded-2xl shadow-xl min-w-[90%] h-[550px] gap-2 backdrop-sepia-0 
                 ${selectedUser ? 'md:grid-cols-[1fr_1.5fr_1fr] xl:grid-cols-[1fr_2fr_1fr]' : 'md:grid-cols-2'} `}>
                 <Sidebar selectedUser={selectedUser} setSelectedUser={setSelectedUser} />
-                <ChatContainer />
-                <RightSidebar />
+                <ChatContainer selectedUser={selectedUser} />
+                <RightSidebar  selectedUser={selectedUser}/>
             </div>
         </div>
     )
