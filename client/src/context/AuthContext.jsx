@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuth = async () => {
         try {
-            const {data} = await axios.get('/api/auth/check-auth');
+            const { data } = await axios.get('/api/auth/check-auth');
             if (data.success) {
                 setAuthUser(data.user);
                 connectSocket(data.user);
@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
 
     //connect socket function to handle socket connection and online users update
     const connectSocket = (userData) => {
-        if (!userData || !socket.connected) return;
+        if (!userData || !socket) return;
         const newSocket = io({
             query: {
                 userId: userData._id
@@ -50,20 +50,20 @@ export const AuthProvider = ({ children }) => {
     //login function 
     const login = async (state, credentials) => {
         try {
-            const {data} = await axios.post(`/api/auth/${state}`, credentials);
-            if(data.success){
+            const { data } = await axios.post(`/api/auth/${state}`, credentials);
+            if (data.success) {
                 setAuthUser(data.userData);
                 connectSocket(data.userData);
                 axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
                 setToken(data.token);
-                localStorage.setItem("token",data.token);
+                localStorage.setItem("token", data.token);
                 toast.success(data.message);
-            }else{
+            } else {
                 toast.error(data.message);
             }
         } catch (err) {
             console.log(err);
-            toast.error("Eee");
+            toast.error(err);
         }
     }
 
@@ -74,20 +74,32 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('token');
         axios.defaults.headers.common['Authorization'] = null;
         toast.success("Logged out successfully");
-        if(socket){
+        if (socket) {
             socket.disconnect();
         }
     }
 
     //update user profiles
-    const updateProfile = async (updatedData)   => {
-        try{
-            const {data} = await axios.put('/api/auth/update-profile',updatedData);
-            if(data.success){
+    const updateProfile = async (updatedData) => {
+        try {
+            const { data } = await axios.put('/api/auth/update-profile', updatedData);
+            if (data.success) {
                 setAuthUser(data.user);
                 toast.success(data.message);
             }
-        }catch(err){
+        } catch (err) {
+            console.error(err.message);
+            toast.error(err.message);
+        }
+    }
+
+    //fetch all users 
+    const fetchUsers = async () => {
+        try {
+            const { data } = await axios.get('/api/auth/all-users');
+            if (data.success)
+                return data.users;
+        } catch (err) {
             console.error(err.message);
             toast.error(err.message);
         }
@@ -108,7 +120,8 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         updateProfile,
-        
+        fetchUsers
+
     }
 
     return <AuthContext.Provider value={value} > {children}</AuthContext.Provider>

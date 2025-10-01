@@ -1,23 +1,62 @@
-import { Dot, Image, InfoIcon, Send } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { Image, InfoIcon, Send } from "lucide-react";
+import React, { useContext, useEffect, useState } from "react";
 import assets, { messagesDummyData } from "../assets/assets";
+import toast from "react-hot-toast";
+import axios from "axios";
+import { AuthContext } from "../context/AuthContext";
+import { ChatContext } from "../context/ChatContext";
 
-const ChatContainer = ({ selectedUser, currentUserId }) => {
-    const [conversation, setConversation] = useState([]);
-    currentUserId = '680f50aaf10f3cd28382ecf2'
+const ChatContainer = ({ selectedUser }) => {
+    const [userMessages, setUserMessages] = useState([]);
+    const [currentMessage, setCurrentMessage] = useState("");
+    const { authUser } = useContext(AuthContext);
+    const { getAllMessages } = useContext(ChatContext);
+    const currentUserId = authUser._id;
 
-    const getConversations = () => {
-        if (!selectedUser) return [];
-        return messagesDummyData.filter(
-            (msg) =>
-                msg.senderId === selectedUser._id || msg.receiverId === selectedUser._id
-        );
+    const getUserMessages = async () => {
+        try {
+            const data = await getAllMessages(selectedUser._id);
+            setUserMessages(data);
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const sendMessage = async (e) => {
+        if (e) e.preventDefault();
+        
+        // Don't send empty messages
+        if (!currentMessage.trim()) return;
+
+        try {
+            const { data } = await axios.post(
+                "/api/messages/send-message/" + selectedUser._id,
+                {
+                    messageText: currentMessage,
+                    // mediaUrl: mediaUrl
+                }
+            );
+            
+            if (data.success) {
+                setCurrentMessage("");
+                // Refresh messages after sending
+                await getUserMessages();
+            }
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
     };
 
     useEffect(() => {
         if (selectedUser) {
-            let data = getConversations();
-            setConversation(data);
+            getUserMessages();
         }
     }, [selectedUser]);
 
@@ -56,53 +95,64 @@ const ChatContainer = ({ selectedUser, currentUserId }) => {
 
             {/* Chat area */}
             <div className="flex-1 flex flex-col-reverse overflow-y-auto gap-3 p-3">
-                {conversation.map((message) => {
-                    const isMe = message.senderId === currentUserId;
-                    return (
-                        <div
-                            key={message._id}
-                            className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}
-                        >
-                            {/* Avatar (left for them, right for me) */}
-                            {!isMe && (
-                                <img
-                                    src={selectedUser?.profilePic || assets.avatar_icon}
-                                    alt="sender avatar"
-                                    className="w-7 h-7 rounded-full"
-                                />
-                            )}
-
-                            {/* Message bubble */}
+                {userMessages &&
+                    userMessages.map((message) => {
+                        const isMe = message.senderId === currentUserId;
+                        return (
                             <div
-                                className={`px-3 py-2 rounded-lg max-w-xs ${isMe ? "bg-blue-600 text-white" : "bg-gray-700 text-white"
-                                    }`}
+                                key={message._id}
+                                className={`flex items-end gap-2 ${
+                                    isMe ? "justify-end" : "justify-start"
+                                }`}
                             >
-                                {message.text || (
+                                {/* Avatar (left for them, right for me) */}
+                                {!isMe && (
                                     <img
-                                        src={message.image}
-                                        alt="sent"
-                                        className="max-w-[200px] rounded-md"
+                                        src={
+                                            selectedUser?.profilePic ||
+                                            assets.avatar_icon
+                                        }
+                                        alt="sender avatar"
+                                        className="w-7 h-7 rounded-full"
                                     />
                                 )}
-                                <p className="text-[10px] text-gray-300 mt-1 text-right">
-                                    {new Date(message.createdAt).toLocaleTimeString([], {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                    })}
-                                </p>
-                            </div>
 
-                            {/* My avatar (on the right) */}
-                            {isMe && (
-                                <img
-                                    src={assets.avatar_icon}
-                                    alt="my avatar"
-                                    className="w-7 h-7 rounded-full"
-                                />
-                            )}
-                        </div>
-                    );
-                })}
+                                {/* Message bubble */}
+                                <div
+                                    className={`px-2 py-1 rounded-lg max-w-xs ${
+                                        isMe
+                                            ? "bg-blue-600 text-white"
+                                            : "bg-gray-700 text-white"
+                                    }`}
+                                >
+                                    {message.messageText || (
+                                        <img
+                                            src={message.image}
+                                            alt="sent"
+                                            className="max-w-[200px] rounded-md"
+                                        />
+                                    )}
+                                    <p className="text-[10px] text-gray-300  text-right">
+                                        {new Date(
+                                            message.createdAt
+                                        ).toLocaleTimeString([], {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                        })}
+                                    </p>
+                                </div>
+
+                                {/* My avatar (on the right) */}
+                                {isMe && (
+                                    <img
+                                        src={assets.avatar_icon}
+                                        alt="my avatar"
+                                        className="w-7 h-7 rounded-full"
+                                    />
+                                )}
+                            </div>
+                        );
+                    })}
             </div>
 
             {/* Input bar */}
@@ -112,10 +162,16 @@ const ChatContainer = ({ selectedUser, currentUserId }) => {
                         type="text"
                         className="border-none outline-none w-full bg-transparent text-white"
                         placeholder="Say something..."
+                        value={currentMessage}
+                        onChange={(e) => setCurrentMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
                     />
                     <Image className="text-gray-400 cursor-pointer hover:text-white" />
                 </span>
-                <Send className="text-blue-500 cursor-pointer hover:text-blue-400" />
+                <Send
+                    className="text-blue-500 cursor-pointer hover:text-blue-400"
+                    onClick={sendMessage}
+                />
             </div>
         </div>
     );

@@ -8,12 +8,12 @@ const LoginPage = () => {
     const [currentState, setCurrentState] = useState("Sign up");
     const [formData, setFormData] = useState({
         userName: "",
-        bio:"",
+        bio: "",
         password: "",
         email: "",
         accept: false
     })
-    const {login} = useContext(AuthContext);
+    const { login } = useContext(AuthContext);
 
     const navigate = useNavigate();
     const onChange = (e) => {
@@ -25,16 +25,20 @@ const LoginPage = () => {
         }))
     }
 
-
     const handleSubmit = (e) => {
         e.preventDefault();
-        login(currentState === "Sign up" ? "signup" : "login", {userName:formData.userName, email: formData.email, password: formData.password, bio: formData.bio});
+        const body = {
+            ...(currentState === "Sign up" && { userName: formData.userName }),
+            email: formData.email,
+            password: formData.password
+        }
+        login(currentState === "Sign up" ? "signup" : "login",body);
         navigate("/");
     }
 
     return (
         <div className="flex min-h-screen justify-center items-center w-full px-4">
-            <div className="flex flex-col md:flex-row justify-between items-center w-full max-w-5xl">
+            <div className="flex flex-col md:flex-row justify-between items-center w-[60%] max-w-5xl">
 
                 {/* Logo */}
                 <img
@@ -44,17 +48,20 @@ const LoginPage = () => {
                 />
 
                 {/* Form */}
-                <form  onSubmit={handleSubmit} className="flex flex-col gap-5 border rounded-2xl p-6 backdrop-blur-2xl w-[40%]">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-5 border rounded-2xl p-6 backdrop-blur-2xl w-[40%]">
                     <h2>{currentState}</h2>
-                    <input
-                        name="userName"
-                        type="text"
-                        className="border rounded-md p-2"
-                        placeholder="Username"
-                        value={formData.userName}
-                        onChange={onChange}
-                        required
-                    />
+                    {currentState === "Sign up" &&
+                        <input
+                            name="userName"
+                            type="text"
+                            className="border rounded-md p-2"
+                            placeholder="Username"
+                            value={formData.userName}
+                            onChange={onChange}
+                            required
+                        />
+                    }
+
                     <input
                         name="email"
                         type="email"
@@ -62,7 +69,6 @@ const LoginPage = () => {
                         placeholder="Email"
                         onChange={onChange}
                         required
-
                     />
                     <input
                         name="password"
@@ -80,7 +86,7 @@ const LoginPage = () => {
                        rounded-md p-2 text-white font-medium"
                         type="submit"
                     >
-                       {currentState==="Sign up" ? 'Create Account' : 'Log in'}
+                        {currentState === "Sign up" ? 'Create Account' : 'Log in'}
                     </button>
 
 
@@ -92,19 +98,19 @@ const LoginPage = () => {
                             </span>
 
                             <span className="text-sm lex flex-row items-center gap-2">
-                                Already have an account?
-                                <a className="text-blue-500" href="/login">
+                                Already have an account? {" "}
+                                <a className="text-blue-500 cursor-pointer"  onClick={() => setCurrentState("Log in")}>
                                     Login here
                                 </a>
                             </span>
                         </>
                         :
-                         <span className="text-sm flex flex-row items-center gap-2">
-                                Create an account 
-                                <a className="text-blue-500" href="/login">
-                                    Click here
-                                </a>
-                            </span>
+                        <span className="text-sm flex flex-row items-center gap-2">
+                            Create an account
+                            <a className="text-blue-500" href="/login">
+                                Click here
+                            </a>
+                        </span>
                     }
 
                 </form>
