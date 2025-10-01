@@ -80,7 +80,7 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
                                     className="rounded-full"
                                 />
                                 <div className='flex flex-col gap-1'>
-                                    <p>{user.fullName}</p>
+                                    <p>{user.userName}</p>
                                     {/* <p className={`text-xs ${user.seen==='seen' ? 'text-green-200':'text-gray-200'}`}>{user.seen ? 'Online' : 'Offline'}</p> */}
                                     <p className={`text-sm ${status == "active" ? 'text-green-200' : 'text-gray-200'}`}>{status == 'active' ? 'Online' : 'Offline'}</p>
                                 </div>

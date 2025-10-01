@@ -31,7 +31,7 @@ const RightSidebar = ({ selectedUser }) => {
         <div className='flex flex-col pt-5 w-full'>
             <div className='flex flex-col justify-center items-center gap-2 mb-4'>
                 <img src={selectedUser?.profilePic || assets.avatar_icon} alt="" className="w-30 rounded-full" />
-                <p>{selectedUser.fullName}</p>
+                <p>{selectedUser.userName}</p>
                 <p className='text-sm text-gray-400'>{selectedUser.bio}</p>
             </div>
             <hr className="w-full border-t border-gray-300" />

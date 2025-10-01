@@ -49,7 +49,7 @@ const ChatContainer = ({ selectedUser, currentUserId }) => {
                         {/* online dot */}
                         <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-gray-900" />
                     </div>
-                    <p>{selectedUser?.fullName || "Unknown"}</p>
+                    <p>{selectedUser?.userName || "Unknown"}</p>
                 </span>
                 <InfoIcon />
             </div>

@@ -1,16 +1,20 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import assets from "../assets/assets";
 import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 
 const LoginPage = () => {
 
     const [currentState, setCurrentState] = useState("Sign up");
     const [formData, setFormData] = useState({
         userName: "",
+        bio:"",
         password: "",
         email: "",
         accept: false
     })
+    const {login} = useContext(AuthContext);
+
     const navigate = useNavigate();
     const onChange = (e) => {
         const { name, value } = e.target;
@@ -24,13 +28,8 @@ const LoginPage = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if(currentState=="Sign up"){
-            navigate("/profile");
-        }else{
-            navigate("/");
-        }
-
-
+        login(currentState === "Sign up" ? "signup" : "login", {userName:formData.userName, email: formData.email, password: formData.password, bio: formData.bio});
+        navigate("/");
     }
 
     return (
@@ -79,6 +78,7 @@ const LoginPage = () => {
                         className="w-full bg-gradient-to-r from-blue-500 to-green-500 
                        hover:from-blue-600 hover:to-green-600 
                        rounded-md p-2 text-white font-medium"
+                        type="submit"
                     >
                        {currentState==="Sign up" ? 'Create Account' : 'Log in'}
                     </button>
