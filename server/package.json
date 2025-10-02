@@ -5,7 +5,11 @@
   "main": "server.js",
   "scripts": {
     "server": "nodemon server.js",
+    "build": "npm install",
     "start": "node server.js"
+  },
+  "enginer":{
+    "node":">=20.0.0"
   },
   "keywords": [],
   "author": "",
