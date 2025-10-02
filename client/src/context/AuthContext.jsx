@@ -5,6 +5,8 @@ import { io } from 'socket.io-client';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+
 
 export const AuthContext = createContext();
 
