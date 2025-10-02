@@ -3,78 +3,6 @@ import { Message } from "../models/message.js";
 import Users from "../models/users.js";
 import { io, userSocketMap } from "../server.js";
 
-//send message 
-export const sendMessage = async (req, res) => {
-    try {
-        const { senderId, receiverId, messageText, mediaUrl } = req.body;
-        const newMessage = await Message.create({
-            senderId,
-            receiverId,
-            messageText,
-            mediaUrl,
-            seen: false
-        })
-
-
-    } catch (err) {
-        console.error(err.message);
-        res.json({ success: false, message: err.message });
-    }
-}
-
-//get unseen messages count for sidebar
-export const getUnseenMessagesCount = async (req, res) => {
-    try {
-        const userId = req.user._id; //myid
-        const filteredUsers = await Users.find({ _id: { $ne: userId } }).select("-password -bio -profilePic -createdAt -updatedAt -__v");
-
-        //count unseen messages for each user
-        const usersWithUnseenCount = await Promise.all(filteredUsers.map(async (user) => {
-            const unseenCount = await Message.countDocuments({ senderId: user._id, receiverId: userId, seen: false });
-            return { ...user.toObject(), unseenCount };
-        }));
-
-        const mappedData = {};
-        usersWithUnseenCount.forEach((data) => {
-            mappedData[data._id] = data.unseenCount; 
-        });
-        res.json({ success: true, unSeenCountMap: mappedData });
-
-    } catch (err) {
-        console.error(err.message);
-        res.json({ success: false, message: err.message });
-    }
-}
-
-//get all messages for selectd user
-export const getAllMessages = async (req, res) => {
-    try {
-        const myId = req.user._id;
-        const { id: selectedId } = req.params;
-        const messages = await Message.find({ $or: [{ senderId: selectedId, receiverId: myId }, { senderId: myId, receiverId: selectedId }] }).sort({ createdAt: 1 });
-        await Message.updateMany({ senderId: selectedId, receiverId: myId }, { seen: true });
-        res.json({ success: true, messages: messages })
-    } catch (err) {
-        console.error(err.message);
-        res.json({ success: false, message: err.message });
-    }
-}
-
-
-//api to mark messages as seen by id
-export const markMessagesAsSeen = async (req, res) => {
-    try {
-        const myId = req.user._id;
-        const { id: selectedId } = req.params;
-
-        await Message.findByIdAndUpdate(id, { seen: true });
-        await res.json({ success: true });
-    } catch (err) {
-        console.error(err.message);
-        res.json({ success: false, message: err.message });
-    }
-}
-
 //send message to a user
 export const sendMessageToUser = async (req, res) => {
     try {
@@ -85,28 +13,135 @@ export const sendMessageToUser = async (req, res) => {
         if (mediaUrl) {
             const upload = await cloudinary.uploader.upload(mediaUrl);
             imgUrl = upload.secure_url;
-
         }
+
         const message = await Message.create({
             senderId: myId,
             receiverId: selectedId,
             messageText,
-            mediaUrl: imgUrl
+            mediaUrl: imgUrl,
+            seen: false
         });
 
-        const receiverSocketId = userSocketMap[selectedId];
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("new-message", message);
-        }
+        // Convert IDs to strings for socket map lookup
+        const receiverIdStr = selectedId.toString();
+        const senderIdStr = myId.toString();
 
-        res.json({ success: true, message: "Message sent successfully" });
+        // Emit to RECEIVER
+        const receiverSocketId = userSocketMap[receiverIdStr];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("newMessage", message);
+        } 
+
+        // Emit to SENDER (so they see their own message in real-time)
+        const senderSocketId = userSocketMap[senderIdStr];
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("newMessage", message);
+        } 
+        res.json({ success: true, message: message });
 
     } catch (err) {
-        console.error(err.message);
-        res.json({ success: false, message: err.message });
+        console.error("Send message error:", err.message);
+        res.status(500).json({ success: false, message: err.message });
     }
+};
 
-}
+//get unseen messages count for sidebar
+export const getUnseenMessagesCount = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const filteredUsers = await Users.find({ _id: { $ne: userId } }).select("-password -bio -profilePic -createdAt -updatedAt -__v");
+
+        const usersWithUnseenCount = await Promise.all(filteredUsers.map(async (user) => {
+            const unseenCount = await Message.countDocuments({
+                senderId: user._id,
+                receiverId: userId,
+                seen: false
+            });
+            return { ...user.toObject(), unseenCount };
+        }));
+
+        const mappedData = {};
+        usersWithUnseenCount.forEach((data) => {
+            mappedData[data._id] = data.unseenCount;
+        });
+
+        res.json({ success: true, unSeenCountMap: mappedData });
+
+    } catch (err) {
+        console.error("Get unseen count error:", err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+//get all messages for selected user
+export const getAllMessages = async (req, res) => {
+    try {
+        const myId = req.user._id;
+        const { id: selectedId } = req.params;
+
+        const messages = await Message.find({
+            $or: [
+                { senderId: selectedId, receiverId: myId },
+                { senderId: myId, receiverId: selectedId }
+            ]
+        }).sort({ createdAt: 1 });
+
+        // Mark messages as seen when fetching
+        await Message.updateMany(
+            { senderId: selectedId, receiverId: myId, seen: false },
+            { seen: true }
+        );
+
+        res.json({ success: true, messages: messages });
+    } catch (err) {
+        console.error("Get all messages error:", err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+//mark messages as seen
+export const markMessagesAsSeen = async (req, res) => {
+    try {
+        const myId = req.user._id;
+        const { id: selectedId } = req.params;
+        if (!myId || !selectedId) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing user or chat partner ID"
+            });
+        }
+
+        const result = await Message.updateMany(
+            {
+                senderId: selectedId,
+                receiverId: myId,
+                seen: false
+            },
+            { $set: { seen: true } }
+        );
+
+        // Notify the sender that their messages were seen
+        const senderSocketId = userSocketMap[selectedId.toString()];
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("messagesSeen", {
+                senderId: myId.toString(),
+                receiverId: selectedId.toString()
+            });
+        } 
+
+        return res.status(200).json({
+            success: true,
+            updatedCount: result.modifiedCount
+        });
+    } catch (err) {
+        console.error("Mark messages as seen error:", err.message);
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
 
 //fetch recent chats
 export const getRecentChats = async (req, res) => {
@@ -130,19 +165,15 @@ export const getRecentChats = async (req, res) => {
             },
             { $replaceRoot: { newRoot: "$lastMessage" } },
             { $sort: { createdAt: -1 } },
-
-            // Lookup sender info
             {
                 $lookup: {
-                    from: "users", // the collection name in MongoDB
+                    from: "users",
                     localField: "senderId",
                     foreignField: "_id",
                     as: "senderInfo"
                 }
             },
             { $unwind: "$senderInfo" },
-
-            // Lookup receiver info
             {
                 $lookup: {
                     from: "users",
@@ -152,20 +183,33 @@ export const getRecentChats = async (req, res) => {
                 }
             },
             { $unwind: "$receiverInfo" },
-
-            // Project only the fields you need
             {
                 $project: {
-                    _id: 1,
+                    _id: {
+                        $cond: [
+                            { $eq: ["$senderId", myId] },
+                            "$receiverId",
+                            "$senderId"
+                        ]
+                    },
+                    userName: {
+                        $cond: [
+                            { $eq: ["$senderId", myId] },
+                            "$receiverInfo.userName",
+                            "$senderInfo.userName"
+                        ]
+                    },
+                    profilePic: {
+                        $cond: [
+                            { $eq: ["$senderId", myId] },
+                            "$receiverInfo.profilePic",
+                            "$senderInfo.profilePic"
+                        ]
+                    },
+                    lastMessage: "$messageText",
+                    lastMessageTime: "$createdAt",
                     senderId: 1,
-                    receiverId: 1,
-                    messageText: 1,
-                    mediaUrl: 1,
-                    createdAt: 1,
-                    // senderUserName: "$senderInfo.userName",
-                    // senderProfilePic: "$senderInfo.profilePic",
-                    userName: "$receiverInfo.userName",
-                    profilePic: "$receiverInfo.profilePic",
+                    receiverId: 1
                 }
             }
         ]);
@@ -173,7 +217,46 @@ export const getRecentChats = async (req, res) => {
         res.json({ success: true, recentChats: recentMessages });
 
     } catch (err) {
-        console.error(err.message);
-        res.json({ success: false, message: err.message });
+        console.error("Get recent chats error:", err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// Legacy send message (if still used elsewhere)
+export const sendMessage = async (req, res) => {
+    try {
+        const { senderId, receiverId, messageText, mediaUrl } = req.body;
+        const newMessage = await Message.create({
+            senderId,
+            receiverId,
+            messageText,
+            mediaUrl,
+            seen: false
+        });
+
+        res.json({ success: true, message: newMessage });
+    } catch (err) {
+        console.error("Send message error:", err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+export const getSharedMedia = async (req, res) => {
+    try {
+        const myId = req.user._id;
+        const { id: selectedId } = req.params;
+        const mediaMessages = await Message.find({
+            $or: [
+                { senderId: myId, receiverId: selectedId },
+                { senderId: selectedId, receiverId: myId }
+            ],
+            mediaUrl: { $exists: true, $ne: null }
+        })
+            .sort({ createdAt: -1 })
+            .select('mediaUrl messageText senderId receiverId createdAt');
+
+        res.json({success:true,media:mediaMessages});
+    } catch (err) {
+        res.json({ success: false, message: err.message })
     }
 }

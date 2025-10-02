@@ -19,32 +19,10 @@ export const AuthProvider = ({ children }) => {
             const { data } = await axios.get('/api/auth/check-auth');
             if (data.success) {
                 setAuthUser(data.user);
-                connectSocket(data.user);
-                console.log(data.user)
-            } else {
-                console.log(data);
             }
-
         } catch (err) {
-            console.log(err.message);
             toast.error(err.message);
         }
-    }
-
-    //connect socket function to handle socket connection and online users update
-    const connectSocket = (userData) => {
-        if (!userData || !socket) return;
-        const newSocket = io({
-            query: {
-                userId: userData._id
-            }
-        })
-        newSocket.connect();
-        setSocket(newSocket);
-        newSocket.on('online-users', (userIds) => {
-            setonlineUsers(userIds);
-        })
-
     }
 
     //login function 
@@ -53,7 +31,6 @@ export const AuthProvider = ({ children }) => {
             const { data } = await axios.post(`/api/auth/${state}`, credentials);
             if (data.success) {
                 setAuthUser(data.userData);
-                connectSocket(data.userData);
                 axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
                 setToken(data.token);
                 localStorage.setItem("token", data.token);
@@ -62,7 +39,6 @@ export const AuthProvider = ({ children }) => {
                 toast.error(data.message);
             }
         } catch (err) {
-            console.log(err);
             toast.error(err);
         }
     }
@@ -76,6 +52,7 @@ export const AuthProvider = ({ children }) => {
         toast.success("Logged out successfully");
         if (socket) {
             socket.disconnect();
+            setSocket(null);
         }
     }
 
@@ -105,7 +82,37 @@ export const AuthProvider = ({ children }) => {
         }
     }
 
+    // Socket connection effect - runs when authUser changes
     useEffect(() => {
+        if (authUser && !socket) { 
+            const newSocket = io(backendUrl, {
+                query: {
+                    userId: authUser._id
+                },
+                transports: ['websocket'],
+                reconnection: true
+            });
+
+            newSocket.on('online-users', (userIds) => {
+                setonlineUsers(userIds);
+            });
+
+            setSocket(newSocket);
+
+            return () => {
+                newSocket.disconnect();
+            };
+        } else if (!authUser && socket) {
+            socket.disconnect();
+            setSocket(null);
+        }
+    }, [authUser]);
+
+    // Check auth on mount
+    useEffect(() => {
+        if (!token) {
+            return;
+        }
         if (token) {
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         }
@@ -121,8 +128,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         updateProfile,
         fetchUsers
-
     }
 
-    return <AuthContext.Provider value={value} > {children}</AuthContext.Provider>
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

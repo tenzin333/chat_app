@@ -1,39 +1,34 @@
 import react, { useState, useEffect } from 'react';
 import { messagesDummyData } from "../assets/assets";
 import assets from "../assets/assets"; // Add this import
+import { X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import axios from 'axios';
 
-const RightSidebar = ({ selectedUser }) => {
+const RightSidebar = ({ selectedUser,showProfile,setShowProfile }) => {
     const [media, setMedia] = useState([]);
-
-    const fetchConversations = () => {
-        if(!selectedUser)
-            return [];
-        
-        // Fix the filtering logic
-        const mediaMessages = messagesDummyData.filter((msg) => {
-            return msg.image && msg.senderId === selectedUser._id;
-        });
-        
-        // Return only the image URLs
-        return mediaMessages.map(msg => msg.image);
-    }
-
+    
     useEffect(() => {
-        setMedia(fetchConversations());
-    }, [selectedUser]) // Add dependency
+        const fetchMedia = async() => {
+            try{
+                    const {data} = await axios.get("/api/messages/get-shared-media/"+selectedUser._id);
+                    setMedia(data.media);
+            }catch(err){
+                toast.error(err);
+            }
+        }
+        fetchMedia();
+    },[selectedUser])
 
-     
-    if (!selectedUser) {
-        return "";
-    }
 
     return (
         <div className='flex flex-col pt-5 w-full'>
-            <div className='flex flex-col justify-center items-center gap-2 mb-4'>
+            <div className='flex flex-col justify-center items-center gap-2 mb-4 relative'>
                 <img src={selectedUser?.profilePic || assets.avatar_icon} alt="" className="w-30 rounded-full" />
                 <p>{selectedUser.userName}</p>
                 <p className='text-sm text-gray-400'>{selectedUser.bio}</p>
             </div>
+            <div className='absolute top-2 right-3'><X size={"20px"} onClick={()=>setShowProfile(false)} /></div>
             <hr className="w-full border-t border-gray-300" />
             
             {/*Shared Media*/}
@@ -42,11 +37,11 @@ const RightSidebar = ({ selectedUser }) => {
 
                 <div className='flex flex-wrap gap-3 justify-center'>
                     {media && media.length > 0 ?
-                        media.map((imageUrl, index) => {
+                        media.map((msg, index) => {
                             return (
                                 <div key={index} className='border-2 rounded'>
                                     <img 
-                                        src={imageUrl} 
+                                        src={msg.mediaUrl} 
                                         alt={`Shared media ${index + 1}`}
                                         className='w-16 h-16 object-cover rounded' 
                                     />

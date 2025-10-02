@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { ChatContext } from "../context/ChatContext";
 import axios from "axios";
+import toast from "react-hot-toast";
 
 const Sidebar = ({ selectedUser, setSelectedUser }) => {
   const [recentChats, setRecentChats] = useState([]);
@@ -13,10 +14,10 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
   const [unSeenCount, setUnSeenCount] = useState({});
   const [searchText, setSearchText] = useState("");
 
-  const { logout, authUser } = useContext(AuthContext);
+  const { logout, authUser, socket } = useContext(AuthContext);
   const { getRecentChats, getUnseenMessagesCount } = useContext(ChatContext);
   const navigate = useNavigate();
-  const status = "active"; // replace with real status if available
+  const status = "active";
 
   // Fetch recent chats
   const fetchRecentChats = useCallback(async () => {
@@ -75,6 +76,112 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
     []
   );
 
+  // Helper to convert IDs to strings
+  const idToString = (id) => {
+    if (!id) return null;
+    return typeof id === 'object' ? id.toString() : String(id);
+  };
+
+  // Update chat list when new message arrives
+  const updateChatOrder = useCallback((message) => {
+    const { senderId, receiverId, messageText, createdAt, seen } = message;
+    const currentUserId = idToString(authUser._id);
+    const msgSenderId = idToString(senderId);
+    const msgReceiverId = idToString(receiverId);
+    
+    // Determine the other user's ID
+    const otherUserId = msgSenderId === currentUserId ? msgReceiverId : msgSenderId;
+    
+    setRecentChats((prevChats) => {
+      const existingChatIndex = prevChats.findIndex(
+        (chat) => idToString(chat._id) === otherUserId
+      );
+
+      let updatedChats = [...prevChats];
+
+      if (existingChatIndex !== -1) {
+        const existingChat = { ...updatedChats[existingChatIndex] };
+        existingChat.lastMessage = messageText;
+        existingChat.lastMessageTime = createdAt;
+        updatedChats.splice(existingChatIndex, 1);
+        updatedChats.unshift(existingChat);
+      } else {
+        fetchRecentChats();
+        return prevChats;
+      }
+
+      return updatedChats;
+    });
+
+    // Update unseen count only if message is from someone else
+    if (msgSenderId !== currentUserId && !seen) {
+      setUnSeenCount((prev) => ({
+        ...prev,
+        [msgSenderId]: (prev[msgSenderId] || 0) + 1
+      }));
+    }
+  }, [authUser._id, fetchRecentChats]);
+
+  // Handle when OTHER USER reads MY messages (their checkmarks turn blue)
+  const handleMessagesSeen = useCallback((data) => {
+    const { senderId, receiverId } = data;
+    const currentUserId = idToString(authUser._id);
+    
+    // If I'm the sender, reset unseen count for that receiver
+    if (idToString(senderId) === currentUserId) {
+      setUnSeenCount((prev) => ({
+        ...prev,
+        [idToString(receiverId)]: 0
+      }));
+    }
+  }, [authUser._id]);
+
+  // Handle when I read SOMEONE ELSE'S messages (my sidebar badge resets)
+  const handleMessagesSeenByMe = useCallback((data) => {
+    const { receiverId } = data;
+    
+    // Reset unseen count for the user I just read messages from
+    setUnSeenCount((prev) => ({
+      ...prev,
+      [idToString(receiverId)]: 0
+    }));
+  }, []);
+
+  // Subscribe to socket events for real-time updates
+  useEffect(() => {
+    if (!socket) return;  
+    socket.on("newMessage", updateChatOrder);
+    socket.on("messagesSeen", handleMessagesSeen);
+    socket.on("messagesSeenByMe", handleMessagesSeenByMe);
+
+    return () => {
+      socket.off("newMessage", updateChatOrder);
+      socket.off("messagesSeen", handleMessagesSeen);
+      socket.off("messagesSeenByMe", handleMessagesSeenByMe);
+    };
+  }, [socket, updateChatOrder, handleMessagesSeen, handleMessagesSeenByMe]);
+
+  // Mark messages as seen when selecting a user
+  useEffect(() => {
+    const updateSeenMessages = async (id) => {
+      try {
+        await axios.put("/api/messages/mark-seen/" + id);
+        
+        // Local update - socket will also update via messagesSeenByMe
+        setUnSeenCount((prev) => ({
+          ...prev,
+          [id]: 0
+        }));
+      } catch (err) {
+        toast.error(err.message);
+      }
+    };
+
+    if (selectedUser && selectedUser._id) {
+      updateSeenMessages(selectedUser._id);
+    }
+  }, [selectedUser]);
+
   // Initial fetch
   useEffect(() => {
     fetchRecentChats();
@@ -89,9 +196,7 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
 
   const handleLogout = () => logout();
 
-  // Determine which users to display
   const displayUsers = searchText ? searchResults : recentChats;
-  console.log("ddd",displayUsers)
 
   return (
     <div className='border border-r rounded-2xl border-gray-600'>
@@ -108,10 +213,10 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
                 onMouseLeave={() => setShowMore(false)}
               >
                 <p
-                  className='cursor-pointer px-3 py-2 hover:bg-gray-600 text-left'
+                  className='cursor-pointer px-2 py-2 hover:bg-gray-600 text-left'
                   onClick={() => navigate('/profile')}
                 >
-                  Edit
+                  Edit profile
                 </p>
                 <hr className="w-full border-t border-gray-300 my-1" />
                 <p
@@ -159,9 +264,11 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
                   {status === 'active' ? 'Online' : 'Offline'}
                 </p>
               </div>
-              <p className='absolute right-2 top-5 text-sm border rounded-full h-6 w-6 flex justify-center items-center backdrop-blur'>
-                {unSeenCount?.[user._id] || 0}
-              </p>
+              {unSeenCount?.[user._id] > 0 && (
+                <p className='absolute right-2 top-5 text-sm bg-blue-500 text-white rounded-full h-6 w-6 flex justify-center items-center'>
+                  {unSeenCount[user._id]}
+                </p>
+              )}
             </div>
           ))}
         </div>

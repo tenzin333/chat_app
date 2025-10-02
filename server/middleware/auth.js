@@ -10,7 +10,6 @@ export const protectRoute = async (req,res,next) => {
        const authHeader = req.headers.authorization;
         
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            console.log("No token or invalid format");
             return res.status(401).json({ success: false, message: "Unauthorized access" });
         }
         const token = authHeader.split(' ')[1];
