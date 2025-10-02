@@ -1,6 +1,6 @@
 import { Badge, EllipsisVertical, Search } from "lucide-react";
 import React, { useContext, useEffect, useState, useCallback } from "react";
-import assets from '/assets';
+import assets from '/assets/assets';
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { ChatContext } from "../context/ChatContext";
@@ -203,7 +203,7 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
       <div className='flex flex-col p-2 gap-3'>
         {/* Header */}
         <div className='flex flex-row justify-between items-center'>
-          <img src='/assets/logo.png' alt="logo" width="200px" height="200px" />
+          <img src={assets.logo} alt="logo" width="200px" height="200px" />
           <div className='relative' onMouseEnter={() => setShowMore(true)}>
             <EllipsisVertical className='hover' />
             {showMore && (
