@@ -1,6 +1,6 @@
 import { CheckCheck, Image, InfoIcon, Send } from "lucide-react";
 import React, { useContext, useEffect, useState, useRef } from "react";
-import assets  from "/assets/assets";
+import assets  from "@assets/assets";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";

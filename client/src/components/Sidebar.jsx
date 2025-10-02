@@ -1,6 +1,6 @@
 import { Badge, EllipsisVertical, Search } from "lucide-react";
 import React, { useContext, useEffect, useState, useCallback } from "react";
-import assets from '/assets/assets';
+import assets from '@assets/assets';
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { ChatContext } from "../context/ChatContext";

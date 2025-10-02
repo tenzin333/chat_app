@@ -1,5 +1,5 @@
 import react, { useState, useEffect } from 'react';
-import assets from "/assets/assets"; // Add this import
+import assets from "@assets/assets"; // Add this import
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
