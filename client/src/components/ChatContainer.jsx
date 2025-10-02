@@ -1,6 +1,6 @@
 import { CheckCheck, Image, InfoIcon, Send } from "lucide-react";
 import React, { useContext, useEffect, useState, useRef } from "react";
-import assets, { messagesDummyData } from "../assets/assets";
+import assets  from "/assets";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -227,7 +227,7 @@ const ChatContainer = ({ selectedUser, setShowProfile }) => {
         return (
             <div className="flex flex-col justify-center items-center gap-4 backdrop-blur-lg h-full border-r rounded-2xl">
                 <img
-                    src={"/src/assets/logo_icon.svg"}
+                    src={"/assets/logo_icon.svg"}
                     className="max-w-[60px] max-h-[60px]"
                 />
                 <p className="text-lg text-white">Chat anytime, anywhere</p>
@@ -242,7 +242,7 @@ const ChatContainer = ({ selectedUser, setShowProfile }) => {
                 <span className="flex flex-row gap-2 items-center">
                     <div className="relative">
                         <img
-                            src={selectedUser?.profilePic || "/src/assets/avatar_icon.png"}
+                            src={selectedUser?.profilePic || "/assets/avatar_icon.png"}
                             alt="profile pic"
                             width="50"
                             height="50"

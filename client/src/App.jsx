@@ -1,16 +1,16 @@
 import react, { useContext } from 'react';
-import {Navigate, Route, Routes} from 'react-router-dom'
-import HomePage from './layout/Homepage';
+import {Route, Routes} from 'react-router-dom'
 import LoginPage from './layout/LoginPage';
 import ProfilePage from './layout/ProfilePage';
 import {Toaster} from 'react-hot-toast';  
 import { AuthContext } from './context/AuthContext';
+import HomePage from './layout/HomePage';
 
 const App = () => {
   const {authUser,onlineUsers,login,logout,updateProfile,axios} = useContext(AuthContext);
 
   return (
-    <div className="bg-[url('./assets/bg.jpg')] bg-contain text-white">
+    <div className="bg-[url('/assets/bg.jpg')] bg-contain text-white">
       <Toaster/>
       <Routes>
         <Route  path="/" element={authUser ? <HomePage/> : <LoginPage/>} />
