@@ -11,12 +11,16 @@ const app = express();
 const server = http.createServer(app);
 
 app.use(
-  cors({
-    origin: "https://chat-app-frontend-pearl.vercel.app",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true
-  })
-);
+    cors({origin:'*'})
+)
+
+// app.use(
+//   cors({
+//     origin: "https://chat-app-frontend-pearl.vercel.app",
+//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+//     credentials: true
+//   })
+// );
 
 // Body parser AFTER CORS
 app.use(express.json({ limit: "4mb" }));
@@ -24,8 +28,7 @@ app.use(express.json({ limit: "4mb" }));
 // Initialize socket
 export const io = new Server(server, {
   cors: { 
-    origin: "https://chat-app-frontend-pearl.vercel.app",
-    methods: ["GET", "POST"]
+    origin: "*"
   }
 });
 
