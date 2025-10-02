@@ -9,6 +9,24 @@ import { Server } from "socket.io";
 
 const app = express();
 const server = http.createServer(app); //socket supports http server
+const allowedOrigins = [
+  "http://localhost:5173",  // local dev
+  "https://chat-app-frontend-pearl.vercel.app" // production
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // Postman, server-to-server
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
+
+
 
 //initialize socket
 export const io = new Server(server,
