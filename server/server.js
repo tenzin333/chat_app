@@ -10,31 +10,11 @@ import { Server } from "socket.io";
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration - MUST be first, before any other middleware
-const corsOptions = {
-    origin: '*',
-    credentials: true,
-    optionsSuccessStatus: 200,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-};
-
-app.use(cors(corsOptions));
-
-// Additional explicit CORS headers
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-    next();
-});
+pp.use(
+  cors({
+    origin: "*",
+  })
+);
 
 // Body parser AFTER CORS
 app.use(express.json({ limit: "4mb" }));

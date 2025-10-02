@@ -5,16 +5,16 @@ import { protectRoute } from "../middleware/auth.js";
 const messageRouter = express.Router();
 
 // CORS middleware for this router
-messageRouter.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// messageRouter.use((req, res, next) => {
+//     res.setHeader('Access-Control-Allow-Origin', '*');
+//     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+//     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    next();
-});
+//     if (req.method === 'OPTIONS') {
+//         return res.status(200).end();
+//     }
+//     next();
+// });
 
 messageRouter.get("/unseen-count",protectRoute,getUnseenMessagesCount);
 messageRouter.get("/all-messages/:id",protectRoute,getAllMessages);
