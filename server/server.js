@@ -10,9 +10,11 @@ import { Server } from "socket.io";
 const app = express();
 const server = http.createServer(app);
 
-pp.use(
+app.use(
   cors({
-    origin: "*",
+    origin: "https://chat-app-frontend-pearl.vercel.app",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true
   })
 );
 
@@ -21,10 +23,10 @@ app.use(express.json({ limit: "4mb" }));
 
 // Initialize socket
 export const io = new Server(server, {
-    cors: { 
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+  cors: { 
+    origin: "https://chat-app-frontend-pearl.vercel.app",
+    methods: ["GET", "POST"]
+  }
 });
 
 export const userSocketMap = {};
