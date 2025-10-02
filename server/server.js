@@ -10,20 +10,30 @@ import { Server } from "socket.io";
 const app = express();
 const server = http.createServer(app);
 
-// CORS - allow all origins (apply once, before routes)
+// CORS middleware - must be before routes
 app.use(cors());
-
-// Initialize socket with matching CORS config
-export const io = new Server(server, {
-    cors: {
-        origin: "*"
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
     }
+    next();
 });
 
-// Store online users
-export const userSocketMap = {}; //{userId:socketId}
+// Middleware
+app.use(express.json({ limit: "4mb" }));
 
-// Socket connection handler
+// Initialize socket
+export const io = new Server(server, {
+    cors: { origin: "*" }
+});
+
+export const userSocketMap = {};
+
 io.on("connection", (socket) => {
     const userId = socket.handshake.query.userId;
     if (userId) {
@@ -39,10 +49,7 @@ io.on("connection", (socket) => {
     });
 });
 
-// Middleware
-app.use(express.json({ limit: "4mb" }));
-
-// Routes setup
+// Routes
 app.use("/api/status", (req, res) => { res.send("Server is live"); });
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
