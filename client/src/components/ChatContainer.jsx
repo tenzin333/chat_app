@@ -42,8 +42,8 @@ const ChatContainer = ({ selectedUser, setShowProfile }) => {
             channel.subscribe("message", (msg) => {
                 const data = msg.data;
                 if (
-                    (data.from === selectedUser?._id && data.to === currentUserId) ||
-                    (data.from === currentUserId && data.to === selectedUser?._id)
+                    (data.senderId === selectedUser?._id && data.receiverId === currentUserId) ||
+                    (data.senderId === currentUserId && data.receiverId === selectedUser?._id)
                 ) {
                     setUserMessages((prev) => [...prev, data]);
                 }
@@ -113,8 +113,8 @@ const ChatContainer = ({ selectedUser, setShowProfile }) => {
         }
 
         const messageData = {
-            from: currentUserId,
-            to: selectedUser._id,
+            senderId: currentUserId,
+            receierId: selectedUser._id,
             messageText: currentMessage,
             mediaUrl,
             createdAt: new Date().toISOString(),
@@ -237,6 +237,7 @@ const ChatContainer = ({ selectedUser, setShowProfile }) => {
                 {userMessages &&
                     userMessages.map((message, index) => {
                         const isMe = message.senderId === currentUserId;
+                        console.log("e",isMe, message.senderId, currentUserId,message.messageText)
                         const previousMessage = index > 0 ? userMessages[index - 1] : null;
                         const showDateSeparator = shouldShowDateSeparator(message, previousMessage);
 
