@@ -24,6 +24,7 @@ app.use(
 
 // Body parser AFTER CORS
 app.use(express.json({ limit: "4mb" }));
+app.use(cors());
 
 // Initialize socket
 export const io = new Server(server, {

@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
     //login function 
     const login = async (state, credentials) => {
         try {
-            const { data } = await axios.post(`/api/auth/${state}`, credentials,{ withCredentials: true });
+            const { data } = await axios.post(`/api/auth/${state}`, credentials);
             if (data.success) {
                 setAuthUser(data.userData);
                 axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
