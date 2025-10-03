@@ -1,33 +1,31 @@
 import React, { createContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { io } from 'socket.io-client';
+import { Realtime } from 'ably';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
 axios.defaults.headers.common['Content-Type'] = 'application/json';
-
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [token, setToken] = useState(localStorage.getItem('token') || null);
     const [authUser, setAuthUser] = useState(null);
-    const [onlineUsers, setonlineUsers] = useState([]);
-    const [socket, setSocket] = useState(null);
+    const [onlineUsers, setOnlineUsers] = useState([]);
+    const [messages, setMessages] = useState([]);
+    const [ablyClient, setAblyClient] = useState(null);
 
+    // --- Auth functions ---
     const checkAuth = async () => {
         try {
             const { data } = await axios.get('/api/auth/check-auth');
-            if (data.success) {
-                setAuthUser(data.user);
-            }
+            if (data.success) setAuthUser(data.user);
         } catch (err) {
             toast.error(err.message);
         }
     }
 
-    //login function 
     const login = async (state, credentials) => {
         try {
             const { data } = await axios.post(`/api/auth/${state}`, credentials);
@@ -35,30 +33,30 @@ export const AuthProvider = ({ children }) => {
                 setAuthUser(data.userData);
                 axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
                 setToken(data.token);
-                localStorage.setItem("token", data.token);
+                localStorage.setItem('token', data.token);
                 toast.success(data.message);
             } else {
                 toast.error(data.message);
             }
         } catch (err) {
-            toast.error(err);
+            toast.error(err.message || err);
         }
     }
 
-    //logout function
     const logout = () => {
         setAuthUser(null);
         setToken(null);
         localStorage.removeItem('token');
         axios.defaults.headers.common['Authorization'] = null;
         toast.success("Logged out successfully");
-        if (socket) {
-            socket.disconnect();
-            setSocket(null);
+        if (ablyClient) {
+            ablyClient.close();
+            setAblyClient(null);
         }
+        setOnlineUsers([]);
+        setMessages([]);
     }
 
-    //update user profiles
     const updateProfile = async (updatedData) => {
         try {
             const { data } = await axios.put('/api/auth/update-profile', updatedData);
@@ -67,69 +65,72 @@ export const AuthProvider = ({ children }) => {
                 toast.success(data.message);
             }
         } catch (err) {
-            console.error(err.message);
             toast.error(err.message);
         }
     }
 
-    //fetch all users 
     const fetchUsers = async () => {
         try {
             const { data } = await axios.get('/api/auth/all-users');
-            if (data.success)
-                return data.users;
+            if (data.success) return data.users;
         } catch (err) {
-            console.error(err.message);
             toast.error(err.message);
         }
     }
 
-    // Socket connection effect - runs when authUser changes
+    // --- Ably setup ---
     useEffect(() => {
-        if (authUser && !socket) { 
-            const newSocket = io(backendUrl, {
-                query: {
-                    userId: authUser._id
-                },
-                transports: ['websocket'],
-                reconnection: true
+        if (authUser && !ablyClient) {
+            const client = new Realtime({ authUrl: `${backendUrl}/api/ably/auth?userId=${authUser._id}` });
+            const channel = client.channels.get('chat-room');
+
+            // Subscribe to messages
+            channel.subscribe('message', (msg) => {
+                setMessages(prev => [...prev, msg.data]);
             });
 
-            newSocket.on('online-users', (userIds) => {
-                setonlineUsers(userIds);
+            // Presence tracking
+            channel.presence.enter();
+            channel.presence.subscribe('enter', (member) => {
+                setOnlineUsers(prev => [...prev, member.clientId]);
+            });
+            channel.presence.subscribe('leave', (member) => {
+                setOnlineUsers(prev => prev.filter(id => id !== member.clientId));
             });
 
-            setSocket(newSocket);
+            setAblyClient(client);
 
             return () => {
-                newSocket.disconnect();
-            };
-        } else if (!authUser && socket) {
-            socket.disconnect();
-            setSocket(null);
+                channel.presence.leave();
+                client.close();
+                setAblyClient(null);
+            }
         }
     }, [authUser]);
 
     // Check auth on mount
     useEffect(() => {
-        if (!token) {
-            return;
-        }
-        if (token) {
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        }
+        if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         checkAuth();
     }, []);
+
+    // Send a chat message
+    const sendMessage = (text) => {
+        if (!authUser || !ablyClient) return;
+        const channel = ablyClient.channels.get('chat-room');
+        channel.publish('message', { from: authUser._id, text });
+    }
 
     const value = {
         axios,
         authUser,
         onlineUsers,
-        socket,
+        messages,
         login,
         logout,
         updateProfile,
-        fetchUsers
+        fetchUsers,
+        sendMessage
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

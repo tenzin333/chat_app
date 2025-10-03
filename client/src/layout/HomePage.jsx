@@ -2,10 +2,16 @@ import react, { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatContainer from "../components/ChatContainer";
 import RightSidebar from "../components/RightSidebar";
+import { useEffect } from "react";
 
 const HomePage = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [showProfile,setShowProfile] = useState(false);
+
+    useEffect(() => {
+        console.log("selectedUser", selectedUser);
+    },[selectedUser]);
+
     return (
         <div className="flex  items-center justify-center  min-h-screen ">
             <div className={`grid grid-cols-1 overflow-hidden backdrop-blur-2xl border-2 border-gray-600 rounded-2xl shadow-xl min-w-[90%] h-[550px] gap-2 backdrop-sepia-0 

@@ -1,101 +1,85 @@
 import { CheckCheck, Image, InfoIcon, Send } from "lucide-react";
 import React, { useContext, useEffect, useState, useRef } from "react";
-import assets  from "@assets/assets";
+import assets from "@assets/assets";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import { ChatContext } from "../context/ChatContext";
+import { Realtime } from "ably";
+
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 const ChatContainer = ({ selectedUser, setShowProfile }) => {
     const [userMessages, setUserMessages] = useState([]);
     const [currentMessage, setCurrentMessage] = useState("");
-    const { authUser, socket } = useContext(AuthContext);
-    const { getAllMessages } = useContext(ChatContext);
-    const [currentUserId, setCurrentUserId] = useState(authUser._id);
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [selectedImage, setSelectedImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
+    const [ablyClient, setAblyClient] = useState(null);
+    const [messagesChannel, setMessagesChannel] = useState(null);
+    const [onlineUsers, setOnlineUsers] = useState([]);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
+    const { authUser } = useContext(AuthContext);
+    const { getAllMessages } = useContext(ChatContext);
 
+    // Set current user
+    useEffect(() => {
+        if (authUser) setCurrentUserId(authUser._id);
+    }, [authUser]);
+
+    // Initialize Ably Realtime
+    useEffect(() => {
+        if (!authUser) return;
+
+        const initAbly = async () => {
+            const client = new Realtime({
+                authUrl: `${BASE_URL}/api/ably/auth?userId=${authUser._id}`,
+            });
+            const channel = client.channels.get("chat-room");
+
+            // Subscribe to messages
+            channel.subscribe("message", (msg) => {
+                const data = msg.data;
+                if (
+                    (data.from === selectedUser?._id && data.to === currentUserId) ||
+                    (data.from === currentUserId && data.to === selectedUser?._id)
+                ) {
+                    setUserMessages((prev) => [...prev, data]);
+                }
+            });
+
+            // Presence tracking
+            channel.presence.enter();
+            channel.presence.subscribe("enter", (member) => {
+                setOnlineUsers((prev) => [...prev, member.clientId]);
+            });
+            channel.presence.subscribe("leave", (member) => {
+                setOnlineUsers((prev) =>
+                    prev.filter((id) => id !== member.clientId)
+                );
+            });
+
+            setAblyClient(client);
+            setMessagesChannel(channel);
+
+            return () => {
+                channel.presence.leave();
+                client.close();
+            };
+        };
+
+        initAbly();
+    }, [authUser, selectedUser, currentUserId]);
+
+    // Scroll to bottom
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // Helper function to format date labels
-    const formatDateLabel = (date) => {
-        const messageDate = new Date(date);
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-
-        // Reset time to midnight for comparison
-        today.setHours(0, 0, 0, 0);
-        yesterday.setHours(0, 0, 0, 0);
-        messageDate.setHours(0, 0, 0, 0);
-
-        if (messageDate.getTime() === today.getTime()) {
-            return "Today";
-        } else if (messageDate.getTime() === yesterday.getTime()) {
-            return "Yesterday";
-        } else {
-            return messageDate.toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-            });
-        }
-    };
-
-
-    // Helper function to check if date changed between messages
-    const shouldShowDateSeparator = (currentMessage, previousMessage) => {
-        if (!previousMessage) return true;
-
-        const currentDate = new Date(currentMessage.createdAt);
-        const previousDate = new Date(previousMessage.createdAt);
-
-        return currentDate.toDateString() !== previousDate.toDateString();
-    };
-
-
-    const handleImageSelect = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (!file.type.startsWith('image/')) {
-            toast.error('Please select an image file');
-            return;
-        }
-
-        // Validate file size (e.g., 4MB limit)
-        if (file.size > 4 * 1024 * 1024) {
-            toast.error('Image size should be less than 4MB');
-            return;
-        }
-
-        setSelectedImage(file);
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setImagePreview(reader.result);
-        }
-        reader.readAsDataURL(file);
-
-    }
-
-    const handleSendImage = () => {
-        fileInputRef.current.click(); //trigger file input click
-    }
-
-    const removeImage = () => {
-        setSelectedImage(null);
-        setImagePreview(null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    };
-
+    // Fetch messages from backend
     const getUserMessages = async () => {
+        if (!selectedUser) return;
         try {
             const data = await getAllMessages(selectedUser._id);
             setUserMessages(data);
@@ -104,43 +88,54 @@ const ChatContainer = ({ selectedUser, setShowProfile }) => {
         }
     };
 
+    useEffect(() => {
+        if (selectedUser) getUserMessages();
+    }, [selectedUser]);
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [userMessages]);
+
+    // Send message
     const sendMessage = async (e) => {
         if (e) e.preventDefault();
-
-        // Don't send empty messages
         if (!currentMessage.trim() && !selectedImage) return;
 
+        let mediaUrl = null;
+
+        if (selectedImage) {
+            const reader = new FileReader();
+            reader.readAsDataURL(selectedImage);
+            mediaUrl = await new Promise((resolve, reject) => {
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+            });
+        }
+
+        const messageData = {
+            from: currentUserId,
+            to: selectedUser._id,
+            messageText: currentMessage,
+            mediaUrl,
+            createdAt: new Date().toISOString(),
+            seen: false,
+        };
+
         try {
-            let mediaUrl = null;
-
-            if (selectedImage) {
-                const reader = new FileReader();
-                reader.readAsDataURL(selectedImage);
-
-                mediaUrl = await new Promise((resolve, reject) => {
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                });
+            if (messagesChannel) {
+                messagesChannel.publish("message", messageData);
             }
 
-            const { data } = await axios.post(
-                "/api/messages/send-message/" + selectedUser._id,
-                {
-                    messageText: currentMessage,
-                    mediaUrl: mediaUrl
-                }
+            // Persist message in backend
+            await axios.post(
+                `/api/messages/send-message/${selectedUser._id}`,
+                messageData
             );
 
-            if (data.success) {
-                setCurrentMessage("");
-                setSelectedImage(null);
-                setImagePreview(null);
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                }
-            } else {
-                toast.error(data.message);
-            }
+            setCurrentMessage("");
+            setSelectedImage(null);
+            setImagePreview(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         } catch (err) {
             toast.error(err.message);
         }
@@ -153,70 +148,51 @@ const ChatContainer = ({ selectedUser, setShowProfile }) => {
         }
     };
 
-    // Mark messages as seen when opening chat
-    const markMessagesAsSeen = async () => {
-        try {
-            await axios.put(`/api/messages/mark-seen/${selectedUser._id}`);
-        } catch (err) {
-            console.error("Error marking messages as seen:", err);
-        }
+    // Image handling
+    const handleImageSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) return toast.error("Select image file");
+        if (file.size > 4 * 1024 * 1024) return toast.error("Image < 4MB");
+
+        setSelectedImage(file);
+        const reader = new FileReader();
+        reader.onloadend = () => setImagePreview(reader.result);
+        reader.readAsDataURL(file);
     };
 
+    const handleSendImage = () => fileInputRef.current.click();
+    const removeImage = () => {
+        setSelectedImage(null);
+        setImagePreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
 
+    // Date formatting
+    const formatDateLabel = (date) => {
+        const messageDate = new Date(date);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
 
-    // Subscribe to real-time messages
-    useEffect(() => {
-        if (!socket || !selectedUser) return;
+        today.setHours(0, 0, 0, 0);
+        yesterday.setHours(0, 0, 0, 0);
+        messageDate.setHours(0, 0, 0, 0);
 
-        // Handler for new messages
-        const handleNewMessage = (newMessage) => {
-            // Only add message if it's from/to the current chat
-            if (
-                (newMessage.senderId === selectedUser._id && newMessage.receiverId === currentUserId) ||
-                (newMessage.senderId === currentUserId && newMessage.receiverId === selectedUser._id)
-            ) {
-                setUserMessages((prev) => [...prev, newMessage]);
+        if (messageDate.getTime() === today.getTime()) return "Today";
+        if (messageDate.getTime() === yesterday.getTime()) return "Yesterday";
+        return messageDate.toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+        });
+    };
 
-                // If message is from the other user, mark it as seen
-                if (newMessage.senderId === selectedUser._id) {
-                    markMessagesAsSeen();
-                }
-            }
-        };
-
-        // Handler for message seen updates
-        const handleMessageSeen = (data) => {
-            // data should contain: { senderId, receiverId, messageIds }
-            // Update all messages from me to selectedUser as seen
-            if (data.receiverId === currentUserId && data.senderId === selectedUser._id) {
-                setUserMessages((prev) =>
-                    prev.map((msg) =>
-                        msg.senderId === currentUserId && msg.receiverId === selectedUser._id
-                            ? { ...msg, seen: true }
-                            : msg
-                    )
-                );
-            }
-        };
-
-        // Listen to socket events
-        socket.on("newMessage", handleNewMessage);
-        socket.on("messagesSeen", handleMessageSeen);
-
-        // Cleanup listeners on unmount or when selectedUser changes
-        return () => {
-            socket.off("newMessage", handleNewMessage);
-            socket.off("messagesSeen", handleMessageSeen);
-        };
-    }, [socket, selectedUser, currentUserId]);
-
-    // Load messages and mark as seen when user is selected
-    useEffect(() => {
-        if (selectedUser) {
-            getUserMessages();
-            markMessagesAsSeen();
-        }
-    }, [selectedUser]);
+    const shouldShowDateSeparator = (current, previous) => {
+        if (!previous) return true;
+        return new Date(current.createdAt).toDateString() !==
+            new Date(previous.createdAt).toDateString();
+    };
 
     // Auto-scroll when messages change
     useEffect(() => {

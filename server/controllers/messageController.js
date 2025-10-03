@@ -1,15 +1,19 @@
 import cloudinary from "../lib/cloudinary.js";
 import { Message } from "../models/message.js";
 import Users from "../models/users.js";
-import { io, userSocketMap } from "../server.js";
+import Ably from "ably";
 
-//send message to a user
+
+const ably = new Ably.Rest({ key: process.env.ABLY_API_KEY });
+
+// Send message to a user via Ably
 export const sendMessageToUser = async (req, res) => {
     try {
         const { id: selectedId } = req.params;
         const myId = req.user._id;
         const { messageText, mediaUrl } = req.body;
         let imgUrl = null;
+
         if (mediaUrl) {
             const upload = await cloudinary.uploader.upload(mediaUrl);
             imgUrl = upload.secure_url;
@@ -23,23 +27,11 @@ export const sendMessageToUser = async (req, res) => {
             seen: false
         });
 
-        // Convert IDs to strings for socket map lookup
-        const receiverIdStr = selectedId.toString();
-        const senderIdStr = myId.toString();
+        // Publish to Ably channel for this conversation
+        const channelName = `chat-${[myId, selectedId].sort().join("-")}`;
+        ably.channels.get(channelName).publish("newMessage", message);
 
-        // Emit to RECEIVER
-        const receiverSocketId = userSocketMap[receiverIdStr];
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("newMessage", message);
-        } 
-
-        // Emit to SENDER (so they see their own message in real-time)
-        const senderSocketId = userSocketMap[senderIdStr];
-        if (senderSocketId) {
-            io.to(senderSocketId).emit("newMessage", message);
-        } 
-        res.json({ success: true, message: message });
-
+        res.json({ success: true, message });
     } catch (err) {
         console.error("Send message error:", err.message);
         res.status(500).json({ success: false, message: err.message });
@@ -93,42 +85,30 @@ export const getAllMessages = async (req, res) => {
             { seen: true }
         );
 
-        res.json({ success: true, messages: messages });
+        res.json({ success: true, messages });
     } catch (err) {
         console.error("Get all messages error:", err.message);
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
-//mark messages as seen
+// Mark messages as seen
 export const markMessagesAsSeen = async (req, res) => {
     try {
         const myId = req.user._id;
         const { id: selectedId } = req.params;
-        if (!myId || !selectedId) {
-            return res.status(400).json({
-                success: false,
-                message: "Missing user or chat partner ID"
-            });
-        }
 
         const result = await Message.updateMany(
-            {
-                senderId: selectedId,
-                receiverId: myId,
-                seen: false
-            },
-            { $set: { seen: true } }
+            { senderId: selectedId, receiverId: myId, seen: false },
+            { seen: true }
         );
 
-        // Notify the sender that their messages were seen
-        const senderSocketId = userSocketMap[selectedId.toString()];
-        if (senderSocketId) {
-            io.to(senderSocketId).emit("messagesSeen", {
-                senderId: myId.toString(),
-                receiverId: selectedId.toString()
-            });
-        } 
+        // Publish 'messagesSeen' event via Ably
+        const channelName = `chat-${[myId, selectedId].sort().join("-")}`;
+        ably.channels.get(channelName).publish("messagesSeen", {
+            senderId: myId,
+            receiverId: selectedId
+        });
 
         return res.status(200).json({
             success: true,
@@ -136,12 +116,10 @@ export const markMessagesAsSeen = async (req, res) => {
         });
     } catch (err) {
         console.error("Mark messages as seen error:", err.message);
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
+
 
 //fetch recent chats
 export const getRecentChats = async (req, res) => {
@@ -255,7 +233,7 @@ export const getSharedMedia = async (req, res) => {
             .sort({ createdAt: -1 })
             .select('mediaUrl messageText senderId receiverId createdAt');
 
-        res.json({success:true,media:mediaMessages});
+        res.json({ success: true, media: mediaMessages });
     } catch (err) {
         res.json({ success: false, message: err.message })
     }

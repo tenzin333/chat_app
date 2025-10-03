@@ -8,14 +8,15 @@
     "build": "npm install",
     "start": "node server.js"
   },
-  "enginer":{
-    "node":">=20.0.0"
+  "enginer": {
+    "node": ">=20.0.0"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "ably": "^2.14.0",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
