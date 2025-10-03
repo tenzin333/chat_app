@@ -211,7 +211,7 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
         </div>
 
         {/* Search */}
-        <div className="flex border rounded-full items-center px-2 gap-1 mt-3">
+        <div className="flex border rounded-full items-center px-2 gap-1 my-3">
           <Search width="20px" height="20px" />
           <input
             className="text-white text-sm bg-transparent border-none outline-none w-[100%] p-2 flex-1"
@@ -222,8 +222,14 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
           />
         </div>
 
+        <hr />
+        <p className='text-1xs'>Recent chats</p>
+
         {/* Users List */}
         <div className="flex flex-col justify-center gap-3 mt-4 overflow-auto max-h-[400px]">
+          {displayUsers.length==0 && 
+            <p >No recent chats</p>
+           }
           {displayUsers.map(user => (
             <div
               key={user._id}
