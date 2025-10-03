@@ -14,6 +14,9 @@ A real-time one-to-one chat application built with React (frontend), Express + N
 - Profile update  
 - Shared media retrieval  
 
+## Demo
+    https://chat-app-frontend-tenzins-projects-246f77e7.vercel.app/
+
 ## Tech Stack
 
 | Layer       | Technology                             |
